@@ -1,0 +1,49 @@
+name: 'Publish a crate to a CodeArtifact registry'
+description: 'A composite action that produces outputs'
+
+inputs:
+  aws_access_key_id:
+    description: AWS Access Key ID
+    required: true
+  aws_access_key_secret:
+    description: AWS Secret Key
+    required: true
+  aws_region:
+    description: AWS Region
+    required: false
+    default: "us-east-2"
+  domain:
+    description: CodeArtifact Domain
+    required: false
+    default: "lushus"
+  domain_owner:
+    description: CodeArtifact Domain Owner
+    required: false
+    default: "235494812366"
+  package:
+    description: The name of the package to publish
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+    - uses: swatinem/rust-cache@v2
+    - name: Generate Registry Token
+      id: generate_token
+      run: |
+        TOKEN=$(aws codeartifact get-authorization-token --domain ${{ inputs.domain }} --domain-owner ${{ inputs.domain_owner }} --query authorizationToken --output text)
+        echo "TOKEN=$TOKEN" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - name: Publish
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_access_key_secret }}
+        AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+      run: >
+        cargo publish
+        -p ${{ inputs.package }}
+        --verbose
+        --locked
+        --token ${{ steps.generate_token.outputs.TOKEN }}
+      shell: bash
